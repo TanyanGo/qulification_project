@@ -3,27 +3,27 @@ from pyspark.sql.functionsimport col, udf, length, split
 from pyspark.sql.typesimport BooleanType, StringType, FloatType
 import matplotlib.pyplotas plt
 
-# Созданиесессии Spark
+# Создание сессии Spark
 spark = SparkSession.builder.appName("SpiderManReviews").getOrCreate()
 
-# Загрузкаданныхиз CSV спомощьюPySpark
+# Загрузка данныхиз CSV спомощью PySpark
 df = spark.read.csv('imdb-spider-man-reviews.csv', header=True, inferSchema=True)
 
-# Переименованиестолбцаснеправильнымназванием
+# Переименование столбца с неправильным названием
 for column in df.columns:
-if 'Movie' in column:
+if 'Moive' in column:
 df = df.withColumnRenamed(column, 'Movie')
 
-# Оставляемтольконужныестолбцы
+# Оставляем только нужные столбцы
 df_filtered = df.select("Rating", "Title", "Date", "Review", "Movie")
 
-# Преобразованиестолбца Rating ктипу float
+# Преобразование столбца Rating к типу float
 df_filtered = df_filtered.withColumn("Rating", col("Rating").cast(FloatType()))
 
-# Удалениестрокспустымизначениямивстолбце 'Movie'
+# Удаление строк с пустыми значениями в столбце 'Movie'
 df_filtered = df_filtered.filter(col("Movie").isNotNull())
 
-# Функциядляфильтрацииположительныхотзывовипроверкидлины
+# Функция для фильтрации положительных отзывов и проверки длины
 def is_positive_review(rating, review):
 if rating is None or review is None:
 return False
@@ -31,10 +31,10 @@ return False
 
 is_positive_review_udf = udf(is_positive_review, BooleanType())
 
-# ФильтрацияDataFrame
+# Фильтрация DataFrame
 df_filtered = df_filtered.filter(is_positive_review_udf(col("Rating"), col("Review")))
 
-# Функциядляудаленияуказанныхсловизотзывов
+# Функция для удаления указанных слов из отзывов
 def remove_words(review):
 words_to_remove = ["fantastic", "plot", "hate", "origin", "hero", "forward", "hype", "school"]
 review_words = review.split()
@@ -43,16 +43,16 @@ return " ".join(filtered_words)
 
 remove_words_udf = udf(remove_words, StringType())
 
-# Применениефункциидляудаленияслов
+# Применение функции для удаления слов
 df_filtered = df_filtered.withColumn("Cleaned_Review", remove_words_udf(col("Review")))
 
-# Подсчетколичестваотзывовпофильмам
+# Подсчет количества отзывов по фильмам
 df_success = df_filtered.groupBy("Movie").count().orderBy(col("count").desc())
 
-# Конвертацияобратнов pandas DataFrameдляпостроенияграфика
+# Конвертация обратно в pandas DataFrame для построения графика
 df_success_pandas = df_success.toPandas()
 
-# Построениеграфика
+# Построение графика
 plt.figure(figsize=(10, 6))
 plt.barh(df_success_pandas["Movie"], df_success_pandas["count"], color='skyblue')
 plt.xlabel('Number of Positive Reviews')
