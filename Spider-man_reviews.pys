@@ -1,0 +1,61 @@
+from pyspark.sqlimport SparkSession
+from pyspark.sql.functionsimport col, udf, length, split
+from pyspark.sql.typesimport BooleanType, StringType, FloatType
+import matplotlib.pyplotas plt
+
+# Созданиесессии Spark
+spark = SparkSession.builder.appName("SpiderManReviews").getOrCreate()
+
+# Загрузкаданныхиз CSV спомощьюPySpark
+df = spark.read.csv('imdb-spider-man-reviews.csv', header=True, inferSchema=True)
+
+# Переименованиестолбцаснеправильнымназванием
+for column in df.columns:
+if 'Movie' in column:
+df = df.withColumnRenamed(column, 'Movie')
+
+# Оставляемтольконужныестолбцы
+df_filtered = df.select("Rating", "Title", "Date", "Review", "Movie")
+
+# Преобразованиестолбца Rating ктипу float
+df_filtered = df_filtered.withColumn("Rating", col("Rating").cast(FloatType()))
+
+# Удалениестрокспустымизначениямивстолбце 'Movie'
+df_filtered = df_filtered.filter(col("Movie").isNotNull())
+
+# Функциядляфильтрацииположительныхотзывовипроверкидлины
+def is_positive_review(rating, review):
+if rating is None or review is None:
+return False
+    return (rating >= 4) and (len(review.split()) >40)
+
+is_positive_review_udf = udf(is_positive_review, BooleanType())
+
+# ФильтрацияDataFrame
+df_filtered = df_filtered.filter(is_positive_review_udf(col("Rating"), col("Review")))
+
+# Функциядляудаленияуказанныхсловизотзывов
+def remove_words(review):
+words_to_remove = ["fantastic", "plot", "hate", "origin", "hero", "forward", "hype", "school"]
+review_words = review.split()
+filtered_words = [word for word in review_wordsif word.lower() not in words_to_remove]
+return " ".join(filtered_words)
+
+remove_words_udf = udf(remove_words, StringType())
+
+# Применениефункциидляудаленияслов
+df_filtered = df_filtered.withColumn("Cleaned_Review", remove_words_udf(col("Review")))
+
+# Подсчетколичестваотзывовпофильмам
+df_success = df_filtered.groupBy("Movie").count().orderBy(col("count").desc())
+
+# Конвертацияобратнов pandas DataFrameдляпостроенияграфика
+df_success_pandas = df_success.toPandas()
+
+# Построениеграфика
+plt.figure(figsize=(10, 6))
+plt.barh(df_success_pandas["Movie"], df_success_pandas["count"], color='skyblue')
+plt.xlabel('Number of Positive Reviews')
+plt.title('Most Successful Spider-Man Movies Based on Reviews')
+plt.gca().invert_yaxis()
+plt.show()
