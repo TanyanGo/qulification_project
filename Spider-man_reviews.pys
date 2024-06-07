@@ -1,7 +1,7 @@
-from pyspark.sqlimport SparkSession
-from pyspark.sql.functionsimport col, udf, length, split
-from pyspark.sql.typesimport BooleanType, StringType, FloatType
-import matplotlib.pyplotas plt
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, udf, length, split
+from pyspark.sql.types import BooleanType, StringType, FloatType
+import matplotlib.pyplot as plt
 
 # Создание сессии Spark
 spark = SparkSession.builder.appName("SpiderManReviews").getOrCreate()
